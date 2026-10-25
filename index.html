@@ -1,0 +1,338 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Civilization Lab</title>
+<style>
+:root{--bg:#f3efe6;--panel:#fbf8f1;--panel2:#efe9dc;--line:#d9d1bf;--ink:#1f2a26;--mute:#6b786f;--acc:#c2570c;--teal:#0f766e;--red:#c93c2f;--blue:#2b6cb0}
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:13px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+body{display:flex;flex-direction:column}
+header{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);background:#fbf8f1}
+h1{font:700 19px Georgia,serif;margin:0;letter-spacing:.02em}h1 small{display:block;font:11px ui-sans-serif,sans-serif;color:var(--mute);letter-spacing:.08em;text-transform:uppercase}
+.clock{font:600 15px ui-monospace,Consolas,monospace;min-width:150px}.clock small{color:var(--mute);font-weight:400}
+button{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 11px;font:inherit;cursor:pointer}
+button:hover{border-color:var(--teal)}button.on{background:var(--teal);color:#fff;border-color:var(--teal);font-weight:600}
+button.danger:hover{border-color:var(--red)}
+.grp{display:flex;gap:6px;align-items:center}
+input[type=number]{width:64px;background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px}
+main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 380px;min-height:0}
+#left{display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+#mapwrap{flex:1;min-height:120px;position:relative;background:#e6e1d1;overflow:hidden}
+canvas{display:block;width:100%;height:100%}
+#scrub{display:flex;gap:10px;align-items:center;padding:8px 14px;border-top:1px solid var(--line);background:#fbf8f1}
+#scrub input[type=range]{flex:1;accent-color:var(--teal)}
+#chartwrap{height:150px;border-top:1px solid var(--line);position:relative;background:#fbf8f1}
+#chartwrap select{position:absolute;right:8px;top:6px;background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px}
+aside{border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0;background:var(--panel)}
+.tabs{display:flex;border-bottom:1px solid var(--line)}.tabs button{flex:1;border:0;border-radius:0;background:transparent;padding:10px 4px;color:var(--mute)}
+.tabs button.on{background:var(--panel2);color:var(--ink);box-shadow:inset 0 -2px var(--acc)}
+.pane{flex:1;overflow:auto;padding:12px 14px;display:none}.pane.on{display:block}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:8px 0}.kv span:nth-child(odd){color:var(--mute)}
+.bar{height:6px;background:#ddd5c2;border-radius:3px;overflow:hidden;margin-top:4px}.bar i{display:block;height:100%}
+h3{font:600 11px ui-sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--acc);margin:14px 0 6px}
+.lg div{padding:3px 0;border-bottom:1px solid #e6dfcf}.lg b{color:var(--mute);font:11px ui-monospace,monospace;font-weight:400;margin-right:6px}
+.pol{margin:0 0 14px}.pol label{display:flex;justify-content:space-between}.pol input{width:100%;accent-color:var(--acc)}.pol small{color:var(--mute)}
+.shocks{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:4px 6px;border-bottom:1px solid #e6dfcf;text-align:right}th:first-child,td:first-child{text-align:left}th{color:var(--mute);font-weight:500}
+.tl{display:flex;gap:6px;align-items:center;margin:4px 0}.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.stats{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--mute)}.stats b{color:var(--ink);font-weight:600}
+.leg{position:absolute;left:10px;bottom:8px;display:flex;gap:4px 12px;flex-wrap:wrap;font-size:11px;color:var(--mute);background:#fbf8f1e6;padding:4px 8px;border-radius:6px}
+.leg i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+.note{color:var(--mute);font-size:12px}
+@media(max-width:860px){.leg{font-size:10px;gap:2px 8px;right:6px}body{height:auto;min-height:100%}main{grid-template-columns:1fr}#mapwrap{height:340px;flex:none}aside{border-left:0;border-top:1px solid var(--line);min-height:420px}h1 small{display:none}.clock{min-width:0}}
+</style></head><body>
+<header>
+<h1>Civilization Lab<small>80 citizens · deterministic · rewindable</small></h1>
+<div class="clock" id="clock"></div>
+<div class="grp"><button id="play">Play</button><button id="step">Step</button>
+<button data-sp="1" class="on">1x</button><button data-sp="4">4x</button><button data-sp="16">16x</button></div>
+<div class="stats" id="stats"></div>
+<div class="grp" style="margin-left:auto"><button id="newc">New city</button></div>
+</header>
+<main><div id="left">
+<div id="mapwrap"><canvas id="map"></canvas><div class="leg" id="leg"></div></div>
+<div id="scrub"><span class="note">Time</span><input type="range" id="slider" min="0" max="0" value="0"><span class="note" id="slabel"></span></div>
+<div id="chartwrap"><canvas id="chart"></canvas><select id="metric"><option value="pop">Population</option><option value="health">Avg health</option><option value="median">Median wealth</option><option value="treasury">Treasury</option><option value="hunger">Avg hunger</option></select></div>
+</div>
+<aside><div class="tabs" id="tabs"><button data-p="insp" class="on">Inspect</button><button data-p="pol">Policy</button><button data-p="shock">Shocks</button><button data-p="tl">Timelines</button><button data-p="log">Log</button></div>
+<div class="pane on" id="p-insp"></div><div class="pane" id="p-pol"></div><div class="pane" id="p-shock"></div><div class="pane" id="p-tl"></div><div class="pane" id="p-log"></div>
+</aside></main>
+<script>
+/* ===== Engine: deterministic, seeded. State rebuilds from seed + action tape. ===== */
+const GW=14, GH=9;
+const FIRST=["Asha","Ravi","Meera","Kiran","Lena","Omar","Priya","Tomas","Nadia","Arjun","Sana","Felix","Ines","Dev","Maya","Jonas","Zara","Hiro","Leela","Pablo","Noor","Ishan","Clara","Vikram","Rosa","Ben","Anika","Mateo","Tara","Yusuf","Elif","Rohan","Greta","Sam","Devi","Luca","Mina","Karan","Ada","Idris"];
+const LAST=["Rao","Silva","Khan","Berg","Okafor","Patel","Moreau","Tanaka","Haas","Costa","Reddy","Novak","Ali","Weiss","Lopez","Iyer"];
+const POLICY_DEFS={
+ foodSubsidy:{label:"Food subsidy",unit:"$/meal",min:0,max:4,step:0.5,def:0,help:"Treasury pays part of each meal price."},
+ wageTax:{label:"Wage tax",unit:"%",min:0,max:40,step:1,def:20,help:"Share of wages paid to the treasury."},
+ beds:{label:"Hospital beds",unit:"beds",min:0,max:14,step:1,def:6,help:"Clinic capacity. Treatment is paid by the treasury."},
+ welfare:{label:"Welfare",unit:"$/day",min:0,max:20,step:1,def:4,help:"Paid daily to anyone holding under $40."}
+};
+function rand(S){S.rs=(S.rs+0x6D2B79F5)|0;let t=Math.imul(S.rs^(S.rs>>>15),1|S.rs);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;}
+function mk(seed){const S={rs:seed|0};return ()=>rand(S);}
+function makeSim(seed){
+ const S={seed,rs:seed|0,tick:0,policy:{},B:[],C:[],treasury:3000,log:[],hist:[],deaths:0,
+  flood:0,blight:0,stats:{produced:0,admissions:0,bedFull:0,meals:0,missed:0,goods:0,welfare:0,tax:0,care:0}};
+ for(const k in POLICY_DEFS)S.policy[k]=POLICY_DEFS[k].def;
+ const L=mk(7);const used=new Set();
+ const put=(type,name,x,y)=>{used.add(x+","+y);S.B.push({id:S.B.length,type,name,x,y,cash:{farm:150,market:500,workshop:250,clinic:0,hall:0,home:0}[type],stock:{market:40}[type]||0,workers:[],closed:false,sold:0});};
+ put("farm","River Farm",1,1);put("farm","Terrace Farm",1,4);
+ put("market","Square Market",5,4);put("market","East Market",9,4);
+ put("workshop","Loom Works",11,1);put("workshop","Tool Yard",12,2);
+ put("clinic","Clinic",5,7);put("hall","Town Hall",9,7);
+ const cells=[];for(let y=0;y<GH;y++)for(let x=2;x<GW;x++){if(x==7||y==3||y==6||used.has(x+","+y))continue;cells.push([x,y]);}
+ for(let i=cells.length-1;i>0;i--){const j=Math.floor(L()*(i+1));[cells[i],cells[j]]=[cells[j],cells[i]];}
+ for(let i=0;i<20;i++)put("home","Home "+(i+1),cells[i][0],cells[i][1]);
+ const homes=S.B.filter(b=>b.type=="home");
+ const jobPlan=[["farm",12],["market",12],["workshop",22],["clinic",4],["hall",2]];
+ const jobs=[];for(const[t,n]of jobPlan){const bs=S.B.filter(b=>b.type==t);for(let i=0;i<n;i++)jobs.push(bs[i%bs.length].id);}
+ const idx=[...Array(80).keys()];for(let i=79;i>0;i--){const j=Math.floor(rand(S)*(i+1));[idx[i],idx[j]]=[idx[j],idx[i]];}
+ for(let i=0;i<80;i++){
+  const c={id:i,name:FIRST[Math.floor(rand(S)*FIRST.length)]+" "+LAST[Math.floor(rand(S)*LAST.length)],home:homes[i%20].id,job:-1,
+   money:Math.round(110+rand(S)*90),health:90+rand(S)*10,hunger:20+rand(S)*30,ill:false,alive:true,loc:homes[i%20].id,state:"sleeping",log:[],hrsWorked:0,thrift:0.5+rand(S)};
+  S.C.push(c);}
+ idx.forEach((ci,k)=>{if(k<jobs.length){S.C[ci].job=jobs[k];S.B[jobs[k]].workers.push(ci);}});
+ return S;
+}
+function ev(S,msg){S.log.push({t:S.tick,msg});if(S.log.length>400)S.log.shift();}
+function clog(S,c,msg){c.log.push({t:S.tick,msg});if(c.log.length>40)c.log.shift();}
+function price(S){return Math.max(1,6-S.policy.foodSubsidy);}
+function subsidy(S){return S.policy.foodSubsidy;}
+function pay(S,from,amt){return amt;}
+function totalMoney(S){let m=S.treasury;for(const c of S.C)m+=c.money;for(const b of S.B)m+=b.cash;return m;}
+function setLoc(S,c,l,st,why){if(c.state!==st||c.loc!==l){c.state=st;c.loc=l;if(why)clog(S,c,why);}}
+function clinicLoad(S){return S.C.filter(c=>c.alive&&c.state==="at clinic").length;}
+function step(S){
+ const h=S.tick%24,day=Math.floor(S.tick/24),work=(day%7)<5;
+ const retail=6,wholesale=3,mkts=S.B.filter(b=>b.type=="market"),clinic=S.B.find(b=>b.type=="clinic");
+ const open=b=>!b.closed;
+ // farm output
+ const fert=(S.flood>0?0.4:1)*(S.blight>0?0.5:1);
+ // locations occupancy for contagion (before moves, previous state)
+ const sick={};for(const c of S.C)if(c.alive&&c.ill)sick[c.loc]=(sick[c.loc]||0)+1;
+ let beds=S.policy.beds-clinicLoad(S);
+ for(const c of S.C){
+  if(!c.alive)continue;
+  const home=c.home,jb=c.job>=0?S.B[c.job]:null;
+  // body
+  const asleep=(h>=22||h<6);
+  c.hunger=Math.min(100,c.hunger+(asleep?1:3));
+  if(c.hunger>=90){c.health-=1.2;if(c.hunger>=100&&c.health<30&&rand(S)<0.2)clog(S,c,"Starving, no food reachable");}
+  if(c.ill){c.health-=1.0;if(rand(S)<0.025){c.ill=false;clog(S,c,"Fever broke, recovered at home");}}
+  else if(c.hunger<70&&c.health<100)c.health=Math.min(100,c.health+0.35);
+  if(!c.ill&&sick[c.loc]&&rand(S)<Math.min(0.04,0.008*sick[c.loc])){c.ill=true;clog(S,c,"Caught the sickness at "+S.B[c.loc].name);}
+  if(c.health<=0){c.alive=false;S.deaths++;ev(S,c.name+" died ("+(c.hunger>=90?"hunger":"illness")+")");clog(S,c,"Died");continue;}
+  // decisions
+  const cost=price(S);
+  if(c.state==="at clinic"&&(c.health>=88||beds<0&&false)){c.ill=false;setLoc(S,c,home,"home","Discharged from clinic, healthy");}
+  if(c.state==="at clinic"){ // treatment
+    c.ill=c.health<80;c.health=Math.min(100,c.health+(S.treasury>=5?8:2));
+    const fee=5;if(S.treasury>=fee){S.treasury-=fee;clinic.cash+=fee;S.stats.care+=fee;}else c.health+=0;
+    if(c.hunger>=55&&c.money>=cost&&false){}
+    continue;}
+  if((c.ill||c.health<55)&&c.health<70&&beds<=0&&!asleep)S.stats.bedFull++;
+  if((c.ill||c.health<55)&&c.health<70&&beds>0&&open(clinic)&&!asleep){beds--;S.stats.admissions++;setLoc(S,c,clinic.id,"at clinic","Unwell (health "+Math.round(c.health)+"), admitted to clinic");continue;}
+  if(c.hunger>=55&&h>=6&&h<=21){
+    const m=mkts.filter(open).map(b=>b).sort((a,b)=>(Math.abs(a.x-S.B[home].x)+Math.abs(a.y-S.B[home].y))-(Math.abs(b.x-S.B[home].x)+Math.abs(b.y-S.B[home].y)));
+    const mk=m.find(b=>b.stock>=1);
+    if(mk&&c.money>=cost){
+      mk.stock-=1;c.money-=cost;mk.cash+=cost-0;mk.sold++;
+      const sub=subsidy(S);const sp=Math.min(sub,S.treasury);S.treasury-=sp;mk.cash+=sp;
+      // price shown to citizen already reduced by subsidy; market receives retail via citizen+treasury
+      c.hunger=Math.max(0,c.hunger-60);S.stats.meals++;
+      setLoc(S,c,mk.id,"shopping","Hungry, bought a meal at "+mk.name+" for $"+cost.toFixed(1));continue;}
+    else{S.stats.missed++;if(h%6==0)clog(S,c,mk?"Hungry but cannot afford a meal ($"+cost.toFixed(1)+")":"Hungry, markets have no stock");}
+  }
+  if(asleep){setLoc(S,c,home,"sleeping",h==22?"Goes to sleep":null);continue;}
+  if(jb&&work&&h>=8&&h<16&&c.health>50&&open(jb)){setLoc(S,c,jb.id,"working",h==8?"Starts shift at "+jb.name:null);c.hrsWorked++;continue;}
+  if(jb&&work&&h>=8&&h<16&&!open(jb)){setLoc(S,c,home,"home",h==8?jb.name+" is closed, stays home":null);continue;}
+  // leisure
+  if(c.money>70*c.thrift&&rand(S)<0.07){const w=S.B.filter(b=>b.type=="workshop"&&open(b));if(w.length){const b=w[Math.floor(rand(S)*w.length)];const gp=12;c.money-=gp;b.cash+=gp;S.stats.goods++;setLoc(S,c,b.id,"shopping","Buys goods at "+b.name+" for $"+gp);continue;}}
+  if(rand(S)<0.2){const b=S.B[Math.floor(rand(S)*S.B.length)];if(b.type==="home"&&b.id!==home){}else if(b.type!=="clinic"){setLoc(S,c,b.id==home?home:(b.type==="home"?home:b.id),b.type==="hall"||b.type==="market"?"strolling":"strolling",null);continue;}}
+  if(c.state==="strolling"&&rand(S)<0.5)continue;
+  setLoc(S,c,home,"home",c.state==="home"?null:null);
+ }
+ // payroll 17:00
+ if(h===16){
+  for(const b of S.B){
+   if(!b.workers.length||b.type==="home")continue;
+   const rate={farm:2.6,market:2.6,workshop:3,clinic:3,hall:3}[b.type];
+   const due=b.workers.map(i=>S.C[i]).filter(c=>c.alive&&c.hrsWorked>0).map(c=>({c,amt:c.hrsWorked*rate}));
+   const sum=due.reduce((a,d)=>a+d.amt,0);if(!sum)continue;
+   const public_=b.type==="clinic"||b.type==="hall";
+   const avail=public_?S.treasury:b.cash;const f=Math.min(1,avail/sum);
+   for(const d of due){const g=d.amt*f,tx=g*S.policy.wageTax/100;d.c.money+=g-tx;S.treasury+=tx;S.stats.tax+=tx;if(f<1&&!public_)clog(S,d.c,b.name+" could only pay "+Math.round(f*100)+"% of wages");}
+   if(public_)S.treasury-=sum*f;else b.cash-=sum*f;
+  }
+  for(const c of S.C)c.hrsWorked=0;
+ }
+ // farms: production happens through workers present at the farm
+ for(const b of S.B){if(b.type!=="farm")continue;const n=S.C.filter(c=>c.alive&&c.loc===b.id&&c.state==="working").length;{const q=n*1.7*fert;b.stock+=q;S.stats.produced+=q;}}
+ // wholesale 18:00
+ if(h===18){
+  for(const f of S.B.filter(b=>b.type==="farm")){
+   for(const m of mkts.filter(open)){
+    const take=Math.min(f.stock/Math.max(1,mkts.length),Math.max(0,m.cash/wholesale));
+    if(take>0){f.stock-=take;m.stock+=take;m.cash-=take*wholesale;f.cash+=take*wholesale;}
+   }
+  }
+ }
+ // day end 23:00
+ if(h===23){
+  for(const b of S.B){ // dividends from surplus to workers
+   if(b.type==="home"||b.type==="clinic"||b.type==="hall"||!b.workers.length)continue;
+   const reserve=b.type==="market"?350:220;const w=b.workers.map(i=>S.C[i]).filter(c=>c.alive);
+   if(b.cash>reserve&&w.length){const ex=(b.cash-reserve)*0.5;b.cash-=ex;for(const c of w)c.money+=ex/w.length;}
+  }
+  for(const c of S.C){ if(c.alive&&c.money<40&&S.treasury>=S.policy.welfare&&S.policy.welfare>0){c.money+=S.policy.welfare;S.treasury-=S.policy.welfare;S.stats.welfare+=S.policy.welfare;}}
+  if(S.flood>0)S.flood--;if(S.blight>0)S.blight--;
+  record(S);
+ }
+ S.tick++;
+}
+function metrics(S){
+ const a=S.C.filter(c=>c.alive);const w=a.map(c=>c.money).sort((x,y)=>x-y);
+ return{day:Math.floor(S.tick/24),pop:a.length,health:a.length?a.reduce((s,c)=>s+c.health,0)/a.length:0,
+  hunger:a.length?a.reduce((s,c)=>s+c.hunger,0)/a.length:0,median:w.length?w[w.length>>1]:0,treasury:S.treasury,
+  ill:a.filter(c=>c.ill).length,deaths:S.deaths,stock:S.B.filter(b=>b.type=="market").reduce((s,b)=>s+b.stock,0)};
+}
+function record(S){S.hist.push({tick:S.tick,...metrics(S)});}
+function applyAction(S,a){
+ if(a.type==="policy"){S.policy[a.key]=a.value;ev(S,"Policy: "+POLICY_DEFS[a.key].label+" set to "+a.value);}
+ else if(a.type==="flood"){S.flood=3;ev(S,"FLOOD: farm output cut for 3 days");}
+ else if(a.type==="blight"){S.blight=4;ev(S,"CROP BLIGHT: harvests cut for 4 days");}
+ else if(a.type==="plague"){const al=S.C.filter(c=>c.alive&&!c.ill);let n=0;for(let i=0;i<20&&al.length;i++){const c=al.splice(Math.floor(rand(S)*al.length),1)[0];c.ill=true;c.health-=10;clog(S,c,"Infected in the outbreak");n++;}ev(S,"PLAGUE: "+n+" citizens infected");}
+ else if(a.type==="stimulus"){let n=0;for(const c of S.C)if(c.alive&&S.treasury>=50){c.money+=50;S.treasury-=50;n++;}ev(S,"STIMULUS: $50 paid to "+n+" citizens");}
+ else if(a.type==="toggle"){const b=S.B[a.id];b.closed=!b.closed;ev(S,b.name+(b.closed?" closed":" reopened"));}
+}
+function replay(seed,tape,target){
+ const S=makeSim(seed);const at=t=>{for(const a of tape)if(a.t===t)applyAction(S,a);};
+ at(0);while(S.tick<target){step(S);at(S.tick);}return S;
+}
+
+/* ===== UI ===== */
+const $=id=>document.getElementById(id);
+const STATE_COL={sleeping:"#6d7fa6",working:"#d97706",shopping:"#0f9f84",strolling:"#8b5cf6",home:"#7c8a80","at clinic":"#e0443a"};
+const BCOL={farm:"#5f8f3e",market:"#d0793a",workshop:"#8a7bd0",clinic:"#d65a5a",hall:"#d0b04a",home:"#3c5246"};
+const SAVE="civlab-v1";
+let TL=[],active=0,S=null,playing=false,speed=1,sel={kind:null,id:null},acc=0,last=0,cache={};
+const COLORS=["#0f766e","#c2570c","#2b6cb0","#c93c2f","#7c3aed"];
+function newSeed(){return (Math.random()*1e9)|0;}
+function tl(){return TL[active];}
+function load(){try{const j=JSON.parse(localStorage.getItem(SAVE));if(j&&j.TL&&j.TL.length){TL=j.TL;active=j.active||0;S=replay(tl().seed,tl().tape,j.tick||0);return;}}catch(e){}
+ TL=[{name:"Timeline A",seed:42,tape:[],max:0}];active=0;S=replay(42,[],0);}
+function save(){try{localStorage.setItem(SAVE,JSON.stringify({TL,active,tick:S.tick}));}catch(e){}}
+function liveAdvance(){step(S);const t=tl();for(const a of t.tape)if(a.t===S.tick)applyAction(S,a);if(S.tick>t.max)t.max=S.tick;}
+function act(a){const t=tl();t.tape=t.tape.filter(x=>x.t<=S.tick);a.t=S.tick;t.tape.push(a);t.max=S.tick;applyAction(S,a);cache={};save();render();}
+function setPlaying(p){playing=p;$("play").textContent=p?"Pause":"Play";$("play").classList.toggle("on",p);}
+function rewindTo(T){setPlaying(false);S=replay(tl().seed,tl().tape,T);save();render();}
+/* map */
+const map=$("map"),mctx=map.getContext("2d");let cell=40,ox=0,oy=0;
+function fit(c){const r=c.getBoundingClientRect(),d=window.devicePixelRatio||1;c.width=Math.max(10,r.width*d);c.height=Math.max(10,r.height*d);return d;}
+function pos(b){return[ox+(b.x+.5)*cell,oy+(b.y+.5)*cell];}
+function citPos(c){if(c._x!==undefined)return[c._x,c._y];const b=S.B[c.loc],[x,y]=pos(b);const a=(c.id*2.399)%6.283,r=(0.12+((c.id*37)%10)/10*0.28)*cell;return[x+Math.cos(a)*r*(b.type=="home"?1:1.4),y+Math.sin(a)*r*(b.type=="home"?1:1.4)];}
+function drawMap(){
+ const d=fit(map),W=map.width,H=map.height;mctx.setTransform(1,0,0,1,0,0);mctx.clearRect(0,0,W,H);
+ cell=Math.min(W/d/(GW+.6),H/d/(GH+.9));ox=(W/d-GW*cell)/2;oy=(H/d-GH*cell)/2-cell*.15;mctx.scale(d,d);
+ const g=mctx;g.fillStyle="#e6e1d1";g.fillRect(0,0,W/d,H/d);
+ g.fillStyle="#dbe4c6";g.beginPath();g.roundRect(ox-6,oy-6,GW*cell+12,GH*cell+12,14);g.fill();
+ g.fillStyle="#f7f3e8";for(const y of[3,6])g.fillRect(ox,oy+y*cell+cell*.3,GW*cell,cell*.4);g.fillRect(ox+7*cell+cell*.3,oy,cell*.4,GH*cell);
+ g.strokeStyle="#d8cfb8";g.lineWidth=1;g.setLineDash([cell*.12,cell*.12]);for(const y of[3,6]){g.beginPath();g.moveTo(ox,oy+(y+.5)*cell);g.lineTo(ox+GW*cell,oy+(y+.5)*cell);g.stroke();}g.beginPath();g.moveTo(ox+7.5*cell,oy);g.lineTo(ox+7.5*cell,oy+GH*cell);g.stroke();g.setLineDash([]);
+ const fl=S.flood>0;g.strokeStyle=fl?"#5aa0d8":"#7fb6d8";g.lineWidth=fl?cell*1.3:cell*.42;g.lineCap="round";g.beginPath();g.moveTo(ox+cell*.45,oy);g.bezierCurveTo(ox+cell*1.1,oy+cell*3,ox-cell*.1,oy+cell*5,ox+cell*.55,oy+GH*cell);g.stroke();
+ if(fl){g.fillStyle="#5aa0d855";g.fillRect(ox,oy,cell*3.1,GH*cell);}
+ const slot={};
+ for(const b of S.B){const[x,y]=pos(b),w=cell*.84,h=cell*.74,l=x-w/2,t=y-h/2;
+  g.fillStyle="#0000001c";g.beginPath();g.roundRect(l+2,t+3,w,h,6);g.fill();
+  const T=b.type;
+  if(b.closed){g.fillStyle="#b9b4a6";g.beginPath();g.roundRect(l,t,w,h,6);g.fill();}
+  else if(T=="home"){g.fillStyle="#f4e6cc";g.beginPath();g.roundRect(l,t,w,h,6);g.fill();g.fillStyle="#b4562a";g.beginPath();g.moveTo(l-2,t+h*.42);g.lineTo(x,t-h*.08);g.lineTo(l+w+2,t+h*.42);g.fill();}
+  else if(T=="farm"){g.fillStyle="#9fc15f";g.beginPath();g.roundRect(l,t,w,h,6);g.fill();g.strokeStyle="#6f9a38";g.lineWidth=1.5;for(let k=1;k<6;k++){g.beginPath();g.moveTo(l+4,t+k*h/6);g.lineTo(l+w-4,t+k*h/6);g.stroke();}
+   if(S.blight>0){g.fillStyle="#8a6a2acc";g.beginPath();g.roundRect(l,t,w,h,6);g.fill();}g.fillStyle="#a8452f";g.fillRect(l+w*.62,t+h*.08,w*.3,h*.28);}
+  else if(T=="market"){g.fillStyle="#f6d27a";g.beginPath();g.roundRect(l,t,w,h,6);g.fill();const n=7;for(let k=0;k<n;k++){g.fillStyle=k%2?"#fff":"#d6452f";g.fillRect(l+k*w/n,t,w/n,h*.34);}}
+  else if(T=="workshop"){g.fillStyle="#b8afdb";g.beginPath();g.roundRect(l,t,w,h,6);g.fill();g.fillStyle="#6c5fb0";g.beginPath();g.moveTo(l,t+h*.35);for(let k=0;k<3;k++){g.lineTo(l+(k+.5)*w/3,t);g.lineTo(l+(k+1)*w/3,t+h*.35);}g.fill();g.fillStyle="#4a4170";g.fillRect(l+w*.82,t-h*.12,w*.1,h*.3);}
+  else if(T=="clinic"){g.fillStyle="#fff";g.beginPath();g.roundRect(l,t,w,h,6);g.fill();g.strokeStyle="#d9d1bf";g.stroke();g.fillStyle="#d1342a";g.fillRect(x-w*.07,y-h*.28,w*.14,h*.56);g.fillRect(x-w*.22,y-h*.07,w*.44,h*.14);}
+  else{g.fillStyle="#e2d6b0";g.beginPath();g.roundRect(l,t,w,h,6);g.fill();g.fillStyle="#b79a3c";g.beginPath();g.moveTo(l-2,t+h*.3);g.lineTo(x,t-h*.08);g.lineTo(l+w+2,t+h*.3);g.fill();g.fillStyle="#fff8";for(let k=0;k<4;k++)g.fillRect(l+w*(.14+k*.22),t+h*.38,w*.08,h*.5);}
+  if(b.closed){g.strokeStyle="#c93c2f";g.lineWidth=3;g.beginPath();g.moveTo(l+4,t+4);g.lineTo(l+w-4,t+h-4);g.moveTo(l+w-4,t+4);g.lineTo(l+4,t+h-4);g.stroke();}
+  if(sel.kind=="b"&&sel.id==b.id){g.strokeStyle="#0f766e";g.lineWidth=3;g.beginPath();g.roundRect(l-3,t-3,w+6,h+6,8);g.stroke();}
+  if(T!=="home"&&(cell>=40||(sel.kind=="b"&&sel.id==b.id))){const nm=b.name,fs=Math.max(9,cell*.2);g.font="600 "+fs+"px ui-sans-serif,sans-serif";const tw=g.measureText(nm).width+10;g.fillStyle="#fbf8f1ee";g.beginPath();g.roundRect(x-tw/2,t+h+2,tw,fs+5,5);g.fill();g.fillStyle="#1f2a26";g.textAlign="center";g.fillText(nm,x,t+h+fs+2);}
+ }
+ // citizens in slots
+ const cnt={};for(const c of S.C){if(!c.alive)continue;const k=c.loc;const r=cnt[k]=(cnt[k]||0);cnt[k]++;c._r=r;}
+ const rad=Math.max(2.4,cell*.058);
+ for(const c of S.C){if(!c.alive)continue;const b=S.B[c.loc],[x,y]=pos(b);const r=c._r,n=cnt[c.loc];const a=r*2.4,rr=Math.min(cell*.4,cell*.11*Math.sqrt(r+1.2));const px=x+Math.cos(a)*rr*1.05,py=y+Math.sin(a)*rr*.85+cell*.06;c._x=px;c._y=py;
+  g.fillStyle="#fff";g.beginPath();g.arc(px,py,rad+1.2,0,6.283);g.fill();g.fillStyle=c.ill?"#e11d1d":STATE_COL[c.state];g.beginPath();g.arc(px,py,rad,0,6.283);g.fill();
+  if(sel.kind=="c"&&sel.id==c.id){g.strokeStyle="#0f766e";g.lineWidth=2;g.beginPath();g.arc(px,py,rad+5,0,6.283);g.stroke();
+   for(const bid of[c.home,c.job]){if(bid<0)continue;const[bx,by]=pos(S.B[bid]);g.strokeStyle="#0f766e88";g.setLineDash([3,4]);g.beginPath();g.moveTo(px,py);g.lineTo(bx,by);g.stroke();g.setLineDash([]);}}}
+}
+map.addEventListener("click",e=>{const r=map.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top;let best=null,bd=1e9;
+ for(const c of S.C){if(!c.alive)continue;const[x,y]=citPos(c),dd=(x-px)**2+(y-py)**2;if(dd<bd){bd=dd;best=["c",c.id];}}
+ if(!best||bd>(cell*.22)**2){best=null;for(const b of S.B){const[x,y]=pos(b);if(Math.abs(px-x)<cell*.41&&Math.abs(py-y)<cell*.36)best=["b",b.id];}}
+ if(best){sel={kind:best[0],id:best[1]};showTab("insp");render();}});
+/* chart */
+const ch=$("chart"),cx=ch.getContext("2d");
+function series(t,idx){if(idx===active)return S.hist.concat([{tick:S.tick,...metrics(S)}]);const tgt=Math.floor(S.tick/24)*24;const key=idx+"|"+JSON.stringify(t.tape)+"|"+tgt;if(cache[key])return cache[key];const T=replay(t.seed,t.tape,tgt);cache[key]=T.hist.concat([{tick:T.tick,...metrics(T)}]);return cache[key];}
+function drawChart(){
+ const d=fit(ch),W=ch.width/d,H=ch.height/d,m=$("metric").value;cx.setTransform(d,0,0,d,0,0);cx.clearRect(0,0,W,H);
+ const all=TL.map((t,i)=>series(t,i));let lo=1e9,hi=-1e9,xm=1;
+ for(const s of all)for(const p of s){lo=Math.min(lo,p[m]);hi=Math.max(hi,p[m]);xm=Math.max(xm,p.tick);}
+ if(m=="health"||m=="pop"){lo=Math.min(lo,m=="pop"?0:lo);hi=Math.max(hi,m=="pop"?80:100);}if(hi-lo<1){hi=lo+1;}
+ const L=44,R=10,T=14,B=18;cx.strokeStyle="#e2dac8";cx.fillStyle="#6b786f";cx.font="10px sans-serif";cx.lineWidth=1;
+ for(let i=0;i<=3;i++){const y=T+(H-T-B)*i/3;cx.beginPath();cx.moveTo(L,y);cx.lineTo(W-R,y);cx.stroke();cx.textAlign="right";cx.fillText(Math.round(hi-(hi-lo)*i/3),L-4,y+3);}
+ cx.textAlign="center";cx.fillText("day "+(xm/24).toFixed(0),W-R-14,H-4);cx.fillText("0",L,H-4);
+ all.forEach((s,i)=>{cx.strokeStyle=COLORS[i%5];cx.lineWidth=i===active?2.2:1.4;cx.globalAlpha=i===active?1:.75;cx.beginPath();s.forEach((p,k)=>{const x=L+(W-L-R)*p.tick/xm,y=T+(H-T-B)*(1-(p[m]-lo)/(hi-lo));k?cx.lineTo(x,y):cx.moveTo(x,y);});cx.stroke();cx.globalAlpha=1;});
+}
+/* panels */
+function bar(v,col){return '<div class="bar"><i style="width:'+Math.max(0,Math.min(100,v))+'%;background:'+col+'"></i></div>';}
+function hh(t){const d=Math.floor(t/24),h=t%24;return "D"+(d+1)+" "+String(h).padStart(2,"0")+":00";}
+function inspect(){
+ const p=$("p-insp");
+ if(sel.kind=="c"){const c=S.C[sel.id],home=S.B[c.home],job=c.job>=0?S.B[c.job]:null;
+  p.innerHTML='<h3>Citizen</h3><div style="font:600 16px Georgia,serif">'+c.name+(c.alive?'':' (dead)')+'</div><div class="note">'+(c.alive?c.state+" at "+S.B[c.loc].name:"died")+(c.ill?' · ILL':'')+'</div>'+
+  '<div class="kv"><span>Home</span><span>'+home.name+'</span><span>Job</span><span>'+(job?job.name+" ("+job.type+")":"none")+'</span><span>Money</span><span>$'+c.money.toFixed(0)+'</span><span>Health</span><span>'+c.health.toFixed(0)+bar(c.health,"#0f766e")+'</span><span>Hunger</span><span>'+c.hunger.toFixed(0)+bar(c.hunger,"#d97706")+'</span></div>'+
+  '<h3>Decision log</h3><div class="lg">'+c.log.slice(-14).reverse().map(l=>'<div><b>'+hh(l.t)+'</b>'+l.msg+'</div>').join("")+'</div>';}
+ else if(sel.kind=="b"){const b=S.B[sel.id],w=b.workers.map(i=>S.C[i]).filter(c=>c.alive);
+  p.innerHTML='<h3>'+b.type+'</h3><div style="font:600 16px Georgia,serif">'+b.name+'</div><div class="kv"><span>Status</span><span>'+(b.closed?"closed":"open")+'</span>'+
+  (b.type!="home"?'<span>Cash</span><span>$'+b.cash.toFixed(0)+'</span><span>Workers</span><span>'+w.length+'</span>':'<span>Residents</span><span>'+S.C.filter(c=>c.alive&&c.home==b.id).length+'</span>')+
+  (b.type=="farm"||b.type=="market"?'<span>Food stock</span><span>'+b.stock.toFixed(0)+'</span>':'')+'<span>Present now</span><span>'+S.C.filter(c=>c.alive&&c.loc==b.id).length+'</span></div>'+
+  (b.type!="home"&&b.type!="hall"?'<button id="tog" class="danger">'+(b.closed?"Reopen":"Close")+' this building</button>':'')+'<h3>Workers</h3><div class="lg">'+w.map(c=>'<div><a href="#" data-c="'+c.id+'" style="color:var(--teal)">'+c.name+'</a> $'+c.money.toFixed(0)+'</div>').join("")+'</div>';
+  const t=$("tog");if(t)t.onclick=()=>act({type:"toggle",id:b.id});
+  p.querySelectorAll("[data-c]").forEach(a=>a.onclick=e=>{e.preventDefault();sel={kind:"c",id:+a.dataset.c};render();});}
+ else p.innerHTML='<h3>City snapshot</h3>'+summary()+'<h3>Inspect</h3><p class="note">Click a citizen dot or a building on the map to see who they are and why they act. Press Play, then change policy or trigger a shock and watch the log.</p>';
+}
+function summary(){const mk=S.B.filter(b=>b.type=="market"),fm=S.B.filter(b=>b.type=="farm");const inC=S.C.filter(c=>c.alive&&c.state=="at clinic").length;
+ return '<div class="kv"><span>Market food stock</span><span>'+mk.reduce((s,b)=>s+b.stock,0).toFixed(0)+' meals</span><span>Farm stock</span><span>'+fm.reduce((s,b)=>s+b.stock,0).toFixed(0)+'</span><span>Clinic beds in use</span><span>'+inC+' / '+S.policy.beds+'</span><span>Sick people turned away</span><span>'+S.stats.bedFull+' (cumulative hours)</span><span>Meals eaten</span><span>'+S.stats.meals+'</span><span>Missed meals</span><span>'+S.stats.missed+'</span></div>';}
+function policyPane(){const p=$("p-pol");if(p.dataset.t===S.tick+"|"&&p.contains(document.activeElement))return;
+ if(!p.dataset.built||p.dataset.built!==String(active)+S.seed){p.dataset.built=String(active)+S.seed;p.innerHTML='<p class="note">Changes apply from the current moment and are recorded on this timeline, so replays and branches reproduce them.</p>'+Object.keys(POLICY_DEFS).map(k=>{const d=POLICY_DEFS[k];return '<div class="pol"><label><span>'+d.label+'</span><b id="v-'+k+'"></b></label><input type="range" id="r-'+k+'" min="'+d.min+'" max="'+d.max+'" step="'+d.step+'"><small>'+d.help+'</small></div>';}).join("");
+  for(const k in POLICY_DEFS)$("r-"+k).onchange=e=>act({type:"policy",key:k,value:+e.target.value});}
+ for(const k in POLICY_DEFS){const r=$("r-"+k);if(document.activeElement!==r)r.value=S.policy[k];$("v-"+k).textContent=S.policy[k]+" "+POLICY_DEFS[k].unit;}}
+function shockPane(){const p=$("p-shock");if(p.dataset.b)return;p.dataset.b=1;
+ p.innerHTML='<p class="note">Each shock is recorded on the timeline at the current tick.</p><div class="shocks"><button data-s="flood">Flood (farm output down 3 days)</button><button data-s="blight">Crop blight (4 days)</button><button data-s="plague">Outbreak (12 infected)</button><button data-s="stimulus">Stimulus ($50 each)</button></div><p class="note">To close a building, select it on the map and use its Close button.</p>';
+ p.querySelectorAll("[data-s]").forEach(b=>b.onclick=()=>act({type:b.dataset.s}));}
+function tlPane(){const p=$("p-tl");
+ const rows=TL.map((t,i)=>{const T=i===active?S:replay(t.seed,t.tape,S.tick);const m=metrics(T);return '<tr><td><span class="dot" style="background:'+COLORS[i%5]+'"></span> '+t.name+'</td><td>'+m.pop+'</td><td>'+m.health.toFixed(0)+'</td><td>$'+m.median.toFixed(0)+'</td><td>$'+m.treasury.toFixed(0)+'</td><td>'+m.deaths+'</td></tr>';}).join("");
+ p.innerHTML='<p class="note">A branch copies the current timeline. Change policy or trigger a shock in one, switch, and compare outcomes at the same moment ('+hh(S.tick)+').</p><div class="grp" style="margin:8px 0"><button id="br">Branch from now</button></div>'+
+ '<div>'+TL.map((t,i)=>'<div class="tl"><button data-i="'+i+'" class="'+(i===active?'on':'')+'">'+t.name+'</button><span class="note">'+t.tape.length+' actions · up to '+hh(t.max)+'</span></div>').join("")+'</div>'+
+ '<h3>Compare at '+hh(S.tick)+'</h3><table><tr><th></th><th>Pop</th><th>Health</th><th>Median</th><th>Treasury</th><th>Deaths</th></tr>'+rows+'</table>';
+ $("br").onclick=()=>{if(TL.length>=5)return;const t=tl();TL.push({name:"Timeline "+String.fromCharCode(65+TL.length),seed:t.seed,tape:t.tape.filter(x=>x.t<=S.tick).map(x=>({...x})),max:S.tick});active=TL.length-1;S=replay(tl().seed,tl().tape,S.tick);cache={};save();render();};
+ p.querySelectorAll("[data-i]").forEach(b=>b.onclick=()=>{const t=S.tick;active=+b.dataset.i;S=replay(tl().seed,tl().tape,t);if(S.tick>tl().max)tl().max=S.tick;setPlaying(false);save();render();});}
+function logPane(){$("p-log").innerHTML='<div class="lg">'+(S.log.length?S.log.slice(-60).reverse().map(l=>'<div><b>'+hh(l.t)+'</b>'+l.msg+'</div>').join(""):'<p class="note">No events yet.</p>')+'</div>';}
+function showTab(n){document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.p==n));document.querySelectorAll(".pane").forEach(p=>p.classList.toggle("on",p.id=="p-"+n));cur=n;render();}
+let cur="insp";document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>showTab(b.dataset.p));
+function render(){
+ const m=metrics(S);
+ $("clock").innerHTML='Day '+(m.day+1)+' <small>'+String(S.tick%24).padStart(2,"0")+':00 · '+tl().name+'</small>';
+ $("stats").innerHTML='<span>Pop <b>'+m.pop+'</b></span><span>Health <b>'+m.health.toFixed(0)+'</b></span><span>Ill <b>'+m.ill+'</b></span><span>Median $<b>'+m.median.toFixed(0)+'</b></span><span>Treasury $<b>'+m.treasury.toFixed(0)+'</b></span><span>Deaths <b>'+m.deaths+'</b></span><span title="Total money across citizens, buildings and treasury, minus its starting total">Ledger drift <b>'+(totalMoney(S)-LEDGER0).toFixed(2)+'</b></span>';
+ const sl=$("slider");sl.max=Math.max(tl().max,S.tick);if(document.activeElement!==sl||!sl.dataset.drag)sl.value=S.tick;$("slabel").textContent=hh(S.tick)+" / "+hh(Math.max(tl().max,S.tick));
+ drawMap();drawChart();
+ if(cur=="insp")inspect();else if(cur=="pol")policyPane();else if(cur=="shock")shockPane();else if(cur=="tl")tlPane();else logPane();
+}
+function frame(t){if(playing){acc+=(t-last)/1000*4*speed;let n=Math.min(Math.floor(acc),200);acc-=Math.floor(acc);if(n>0){while(n--)liveAdvance();save();render();}}last=t;requestAnimationFrame(frame);}
+$("play").onclick=()=>setPlaying(!playing);
+$("step").onclick=()=>{setPlaying(false);liveAdvance();save();render();};
+document.querySelectorAll("[data-sp]").forEach(b=>b.onclick=()=>{speed=+b.dataset.sp;document.querySelectorAll("[data-sp]").forEach(x=>x.classList.toggle("on",x==b));});
+$("slider").oninput=e=>{setPlaying(false);e.target.dataset.drag=1;rewindTo(+e.target.value);};
+$("slider").onchange=e=>{delete e.target.dataset.drag;};
+$("metric").onchange=drawChart;
+$("newc").onclick=()=>{if(!confirm("Start a new city? Current timelines are discarded."))return;const sd=newSeed();TL=[{name:"Timeline A",seed:sd,tape:[],max:0}];active=0;S=replay(sd,[],0);cache={};sel={kind:null,id:null};setPlaying(false);LEDGER0=totalMoney(S);$("p-pol").dataset.built="";save();render();};
+window.addEventListener("resize",render);
+$("leg").innerHTML=Object.keys(STATE_COL).map(k=>'<span><i style="background:'+STATE_COL[k]+'"></i>'+k+'</span>').join("")+'<span><i style="background:#ff4d4d"></i>ill</span>';
+let LEDGER0=0;load();LEDGER0=totalMoney(makeSim(S.seed));render();requestAnimationFrame(frame);
+window.__civ={citPos:c=>citPos(c),get S(){return S},act,rewindTo,get TL(){return TL}};
+</script></body></html>
